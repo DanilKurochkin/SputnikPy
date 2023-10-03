@@ -3,6 +3,7 @@ import numpy.typing as npt
 import elemath as SMath
 import workloads as wl
 import time
+from enum import Enum
 
 #средневитковая температура
 
@@ -19,7 +20,15 @@ class Material(): #материал пластины
         self.k = k #температуропроводность
  
 class Sputnik(): # спутник
-
+    
+    class Plate(Enum):
+        zenit = 0
+        nadir = 1
+        ortogonal1 = 2
+        ortogonal2 = 3
+        shade = 4
+        solar = 5
+       
     default_orientation = np.array([np.array([1, 0 , 0]),
                                     np.array([-1, 0, 0]),
                                     np.array([0, 1, 0]),
@@ -27,18 +36,21 @@ class Sputnik(): # спутник
                                     np.array([0, 0, 1]),
                                     np.array([0, 0, -1])]) #дефолтная ориентация пластин для куба
     
-    def __init__(self, size : np.float64, width : np.float64, material : Material, coat : 'Coating', orbit : 'ClassicOrbit'):
+    def __init__(self, Lx : np.float64, Ly : np.float64, Lz : np.float64, width : np.float64, material : Material, coat : 'Coating', orbit : 'ClassicOrbit'):
         self.width = width #толщина спутника
-        self.size = size #площадь пластинок
+        self.size = [Ly*Lz, Ly*Lz,
+                     Lx*Lz, Lx*Lz,
+                     Lx*Ly, Lx*Ly] #площадь пластинок
         self.boxes = np.empty(6, dtype=Box) 
         self.boxes : dict[Box, Box]
         self.coat = coat
         self.orbit = orbit
-        
+        self.time = np.float64(0)
         self.externalConditions = []
         #инициалируем стенки спутника
         for i in np.arange(self.boxes.size):
-            self.boxes[i] = Box(0, width, size, material, i, self.default_orientation[i], coat, self)
+            self.boxes[i] = Box(0, width, self.size[i], material, i, self.default_orientation[i], coat, self)
+        
     
     def knitPlates(self): #связываем пластины, чтобы знать какая с какой соприкасается
         for box in self.boxes:
@@ -100,7 +112,7 @@ class Sputnik(): # спутник
         disperancy = 1000
         
         new_disp = np.empty(self.boxes.size, dtype=np.float64)
-        
+
         while disperancy > 10**(-3):
             for i in np.arange(self.boxes.size):
                 self.boxes[i].prevIterT = self.boxes[i].iterT
@@ -147,6 +159,8 @@ class Sputnik(): # спутник
                 self.orbit.Move(ht, self)
                 for externalConditon in self.externalConditions:
                     externalConditon.rotate(self.orbit.getAlpha())
+                
+                self.time += ht
         
         if radiation_check:
             self.writeInnerEnergy(file2, startT)
@@ -328,34 +342,27 @@ class SunLookingOrbit(ClassicOrbit):
             new_orientation = matrix.dot(box.orientation)
             box.orientation = new_orientation  
 
-class HelioStationarOrbit(ClassicOrbit):
-    def __init__(self, radiusAboveEarth, localTime):
-        super().__init__(radiusAboveEarth)
-        res = -np.pi
-        
-    def Move(self, ht, sputnik: Sputnik):
-        pass
-        
 def main():
     
     A6061 = Material(800, 2700, 202) #алюминий 6061
-    coat = Coating(0.9, 0.91) #ЭКОМ-1П a05 e04
+    coat = Coating(0, 0)
     orbit = SunLookingOrbit(500)
     cond = wl.Conditions()
     
-    sp = Sputnik(4, 0.002, A6061, coat, orbit)
+    sp = Sputnik(1, 2, 1, 0.002, A6061, coat, orbit)
     sp.createVolumes(0.0002)
     sp.knitPlates()
     
     cond.addEx(wl.Radiaton(), wl.EarthRadiation(240, earth_radius), wl.Sun(1500), wl.EarthAlbedo(0.3, 1500))
-    cond.addEx()
-    cond.addEt(wl.ConstantHeatFlux(200))
+    cond.addEt(wl.TableFunctionLoadPeriodical(np.array([0, 0, 1000, 1000], dtype=np.float64),
+                                            np.array([0, orbit.period/2, orbit.period/2+1, orbit.period], dtype=np.float64),
+                                            orbit.period))
     sp.addCondition(cond)
-
+    
     wl.Connect.neighbours(sp, 0.5)
 
     start = time.time()
-    sp.solve(30, 100, 1, 290, radiation_check=True)
+    sp.solve(4, 40, 1, 290, radiation_check=True)
     end = time.time()
     
     print(end-start)

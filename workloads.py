@@ -101,7 +101,7 @@ class BoundaryCondition(): #граничное условие
         d = fc
         return a, d
     
-    def FindCoefsEt(box, conditions, T, a1): #вычисление коэфициентов для граничных условий
+    def FindCoefsEt(box, conditions, T,a1): #вычисление коэфициентов для граничных условий
         fT = 0
         fp = 0
         for cond in conditions:
@@ -140,7 +140,7 @@ class Connection(Load):
     
     def heatFlux(self, T):
         n = self.connectedBox.prevIterT.size - 1
-        q = (self.connectedBox.prevIterT[n]- T)/self.R
+        q = (self.connectedBox.prevIterT[n]- T)/self.R * (self.connectedBox.area / self.box.area)
         
         return q
     
@@ -217,7 +217,23 @@ class HeatPipe(Connection):
             return -self.maxHeatFlux
         
         return q
-        
-        
+    
+class TableFuncLoad(Load):
+    def __init__(self, heatFluxPoints, timePoints):
+        self.heatFluxPoints = heatFluxPoints
+        self.timePoints = timePoints
+    
+    def heatFlux(self, box, T):
+        result = np.interp(box.parent.time, self.timePoints, self.heatFluxPoints)
+        return result
 
-#albedo 0.3, тень, солнце, солнечные панели
+class TableFunctionLoadPeriodical(TableFuncLoad):
+    def __init__(self, heatFluxPoints, timePoints, period):
+        super().__init__(heatFluxPoints, timePoints)
+        self.period = period
+    
+    def heatFlux(self, box, T):
+        periodicalT = box.parent.time % self.period
+        result = np.interp(periodicalT, self.timePoints, self.heatFluxPoints)
+        
+        return result

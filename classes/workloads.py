@@ -85,7 +85,7 @@ class Connect():
         sputnik.boxes[num1].connections.append(HeatPipe(R, sputnik.boxes[num1], sputnik.boxes[num2], maxHeatFlux))
         sputnik.boxes[num2].connections.append(HeatPipe(R, sputnik.boxes[num2], sputnik.boxes[num1], maxHeatFlux))
     
-    def byHeatPipeByNum(box1 : 'Box', box2 : 'Box', R):
+    def byHeatPipeByBox(box1 : 'Box', box2 : 'Box', R):
         if(box1.parent is not box2.parent):
             raise ValueError
         

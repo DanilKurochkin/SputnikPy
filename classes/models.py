@@ -1,19 +1,25 @@
 import numpy as np
 from classes.material import Material, Coating
-from enum import Enum
 import classes.elemath as SMath
 import numpy.typing as npt
 
+class PlateCollector():
+        def __init__(self ,sputnik : 'Sputnik'):
+            self.zenit = sputnik.boxes[0]
+            self.zenit : 'Box'
+            self.nadir = sputnik.boxes[1]
+            self.nadir : 'Box'
+            self.ortogonal1 = sputnik.boxes[2]
+            self.ortogonal1 : 'Box'
+            self.ortogonal2 = sputnik.boxes[3]
+            self.ortogonal2 : 'Box'
+            self.shade = sputnik.boxes[4]
+            self.shade : 'Box'
+            self.solar = sputnik.boxes[5]
+            self.solar : 'Box'
+
 class Sputnik(): # спутник
     
-    class Plate(Enum):
-        zenit = 0
-        nadir = 1
-        ortogonal1 = 2
-        ortogonal2 = 3
-        shade = 4
-        solar = 5
-       
     default_orientation = np.array([np.array([1, 0 , 0]),
                                     np.array([-1, 0, 0]),
                                     np.array([0, 1, 0]),
@@ -29,12 +35,15 @@ class Sputnik(): # спутник
         self.boxes = np.empty(6, dtype=Box) 
         self.boxes : dict[Box, Box]
         self.coat = coat
+        self.coat : 'Coating'
         self.orbit = orbit
         self.time = np.float64(0)
         self.externalConditions = []
         #инициалируем стенки спутника
         for i in np.arange(self.boxes.size):
             self.boxes[i] = Box(0, width, self.size[i], material, i, self.default_orientation[i], coat, self)
+        self.plate = PlateCollector(self)
+        self.plate : PlateCollector
         
     
     def knitPlates(self): #связываем пластины, чтобы знать какая с какой соприкасается
@@ -112,7 +121,7 @@ class Sputnik(): # спутник
         for i in np.arange(self.boxes.size):
             self.boxes[i].T = self.boxes[i].iterT
     
-    def solve(self, amountOfRounds : int, pointsInRounds : int, save_every, startT = 300,filePath = 'output.txt', radiation_check = False, HeatCheckPath = 'outputheat.txt'): #решаем численно всё для всех пластинок в спутнике
+    def solve(self, amountOfRounds : int, pointsInRounds : int, save_every : int, startT = 300,filePath = 'output.txt', radiation_check = False, HeatCheckPath = 'outputheat.txt'): #решаем численно всё для всех пластинок в спутнике
         n = self.boxes[0].T.size
 
         a0 = np.empty(n, dtype=np.float64) #чтобы лишний раз много памяти не выделять

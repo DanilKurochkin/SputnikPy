@@ -7,7 +7,7 @@ from classes.orbits import SunLookingOrbit, earth_radius
 
 def main():
     A6061 = Material(800, 2700, 202) #алюминий 6061
-    coat = Coating(0, 0)
+    coat = Coating(0.5, 0.4)
     orbit = SunLookingOrbit(500)
     cond = Conditions()
 
@@ -20,7 +20,6 @@ def main():
                                             np.array([0, orbit.period/2, orbit.period/2+1, orbit.period], dtype=np.float64),
                                             orbit.period))
     sp.addCondition(cond)
-    
     wl.Connect.neighbours(sp, 0.5)
 
     start = time.time()

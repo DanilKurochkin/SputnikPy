@@ -1,6 +1,6 @@
 from abc import ABC
 import numpy as np
-from classes.models import Box
+from classes.models import Box, Sputnik
 
 sigma = np.float64(5.67*10**(-8))
 
@@ -66,18 +66,31 @@ class Isolated(Load): #изолированная сторона(вообще п
         return np.float64(0)
 
 class Connect():
-    def byNum(sputnik, num1, num2, R):
+    def byNum(sputnik : 'Sputnik', num1, num2, R):
         sputnik.boxes[num1].connections.append(Connection(R, sputnik.boxes[num1],sputnik.boxes[num2]))
         sputnik.boxes[num2].connections.append(Connection(R, sputnik.boxes[num2],sputnik.boxes[num1]))
+    
+    def byBox(box1 : 'Box', box2 : 'Box', R):
+        if(box1.parent is not box2.parent):
+            raise ValueError
+        box1.connections.append(Connect(R, box1, box2))
+        box1.connections.append(Connect(R, box2, box1))
     
     def neighbours(sputnik, R):
         for box in sputnik.boxes:
             for neighbour in box.neighbours:
                 box.connections.append(Connection(R ,box, neighbour))
     
-    def byHeatPipe(sputnik, num1, num2, R, maxHeatFlux):
+    def byHeatPipeByNum(sputnik, num1, num2, R, maxHeatFlux):
         sputnik.boxes[num1].connections.append(HeatPipe(R, sputnik.boxes[num1], sputnik.boxes[num2], maxHeatFlux))
         sputnik.boxes[num2].connections.append(HeatPipe(R, sputnik.boxes[num2], sputnik.boxes[num1], maxHeatFlux))
+    
+    def byHeatPipeByNum(box1 : 'Box', box2 : 'Box', R):
+        if(box1.parent is not box2.parent):
+            raise ValueError
+        
+        box1.connections.append(HeatPipe(R, box1, box2))
+        box1.connections.append(HeatPipe(R, box2, box1))
 
 class Connection(Load):
     

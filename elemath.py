@@ -17,13 +17,5 @@ def TDMA(a : npt.NDArray[np.float64], b : npt.NDArray[np.float64], c : npt.NDArr
     return x
 
 def discrepancy(array1 : npt.NDArray[np.float64], array2 : npt.NDArray[np.float64]):
-    n = array1.size
-    
-    epsilon = 200
-    
-    for i in np.arange(n):
-        new_epsilon = abs(array1[i] - array2[i])
-        if new_epsilon < epsilon:
-            epsilon = new_epsilon
-    
-    return epsilon
+    epsilon = np.abs(array1 - array2)
+    return epsilon.max()

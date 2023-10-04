@@ -1,5 +1,6 @@
-from abc import ABC, abstractmethod
+from abc import ABC
 import numpy as np
+from classes.models import Box
 
 sigma = np.float64(5.67*10**(-8))
 
@@ -10,15 +11,15 @@ class Load(ABC):
     def rotate(self, alpha):
         pass
 
-    def heatFlux(self, box, T):
+    def heatFlux(self, box : Box, T):
         pass
     
-    def heat(self, box, T):
+    def heat(self, box : Box, T):
         Q = self.heatFlux(box, T) * box.area
         
         return Q
     
-    def derivative(self, box, T):
+    def derivative(self, box : Box, T):
         return 0
 
 class Sun(Load): #солнышко и его вращение**
@@ -63,59 +64,6 @@ class Isolated(Load): #изолированная сторона(вообще п
     
     def heatFlux(self, box, T):
         return np.float64(0)
-    
-class Conditions(): #класс для нагрузок действующих на спутник
-    def __init__(self):
-        self.external = []
-        self.ethernal = []
-        
-    def addEx(self, *objects):
-        for obj in objects:
-            self.external.append(obj)
-    
-    def addEt(self, *objects):
-        for obj in objects:
-            self.ethernal.append(obj)
-
-
-class BoundaryCondition(): #граничное условие
-
-    def ConnectionCoefs(box, T):
-        fT = 0
-        fp = 0
-        for connection in box.connections:
-            fT += connection.heatFlux(T)
-            fp += connection.derivative()
-        
-        return fT, fp
-    
-    def FindCoefsEx(box, conditions, T, a1): #вычисление коэфициентов для граничных условий
-        fT = 0
-        fp = 0
-        for cond in conditions:
-            fT += cond.heatFlux(box, T)    
-            fp += cond.derivative(box, T)
-        fc = fT - fp * T
-        
-        a = a1 - fp
-        d = fc
-        return a, d
-    
-    def FindCoefsEt(box, conditions, T,a1): #вычисление коэфициентов для граничных условий
-        fT = 0
-        fp = 0
-        for cond in conditions:
-            fT += cond.heatFlux(box, T)
-            fp += cond.derivative(box, T)
-        res = BoundaryCondition.ConnectionCoefs(box, T)
-        fT += res[0]
-        fp += res[1]
-        
-        fc = fT - fp * T
-        
-        a = a1 -fp
-        d = fc
-        return a, d
 
 class Connect():
     def byNum(sputnik, num1, num2, R):

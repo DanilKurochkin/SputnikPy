@@ -15,7 +15,7 @@ def main():
     sp.createVolumes(5)
     sp.knitPlates()
     
-    cond.addEx()
+    cond.addEx(wl.Isolated())
     cond.addEt(wl.ConstantHeatFlux(1000))
     sp.addCondition(cond)
 
@@ -24,13 +24,5 @@ def main():
     end = time.time()
     
     print(end-start)
-    # orbit = SunLookingOrbit(500)
-    # timeDots = np.array([0, orbit.period/2 - 0.5, orbit.period/2 + 0.5, orbit.period], dtype=np.float64)
-    # heatDots = np.array([0, 0, 1000, 1000], dtype=np.float64)
-    # tabl = wl.TableFunctionLoadPeriodical(heatDots,
-    #                                         timeDots,
-    #                                         orbit.period)
-    # n = timeDots[(0<timeDots) & (timeDots<orbit.period)]
-    # print(str(tabl.calculator(orbit.period/2-0.5, 0.5)))
 
 main()

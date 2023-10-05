@@ -1,6 +1,6 @@
 import numpy as np
 import numpy.typing as npt
-
+#метод простой прогонки
 def TDMA(a : npt.NDArray[np.float64], b : npt.NDArray[np.float64], c : npt.NDArray[np.float64], d : npt.NDArray[np.float64], P  : npt.NDArray[np.float64] , Q  : npt.NDArray[np.float64]):
     n = a.size
     x = np.empty(n, dtype=np.float64)
@@ -16,6 +16,7 @@ def TDMA(a : npt.NDArray[np.float64], b : npt.NDArray[np.float64], c : npt.NDArr
         x[i - 1] = P[i - 1]*x[i] + Q[i - 1]
     return x
 
+#вычисление невязки по отклонению от предыдущего решения
 def discrepancy(array1 : npt.NDArray[np.float64], array2 : npt.NDArray[np.float64]):
     epsilon = np.abs(array1 - array2)
-    return epsilon.max()
+    return np.max(epsilon)

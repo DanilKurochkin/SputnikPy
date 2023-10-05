@@ -12,23 +12,23 @@ class ClassicOrbit(): #орбита
         self.length = 2*np.pi*self.radius #длина орбиты
         self.period = self.length/self.velocity #период полного оборота
         self.position = np.float64(0)
-        self.sunset = np.array([np.arccos(earth_radius/self.radius) + np.pi/2, 3*np.pi/2 - np.arccos(earth_radius/self.radius)])
+        self.sunset = np.array([np.arccos(earth_radius/self.radius) + np.pi/2, 3*np.pi/2 - np.arccos(earth_radius/self.radius)]) # угол захода в тень
         
-    def getAlpha(self):
+    def getAlpha(self): # угол между линией Земля-Солнце и спутником
         return self.position/self.radius
     
-    def InShadow(self):
+    def InShadow(self): #проверка на нахожеднии в тени
         a = self.getAlpha()
         if a>self.sunset[0] and a<self.sunset[1]:
             return True
         return False
     
-    def Move(self, ht, sputnik : Sputnik):
+    def Move(self, ht, sputnik : Sputnik): #измение позиции спутника
         self.position += ht*self.velocity
         if(self.position >= self.length):
             self.position -= self.length
          
-class SunLookingOrbit(ClassicOrbit):
+class SunLookingOrbit(ClassicOrbit): #разница между этой орбитой и классической в том, что спутник разворачивается по оси надир-зенит в полдень и полночь
     def __init__(self, radiusAboveEarth):
         super().__init__(radiusAboveEarth)
         self.ZenitRotate = False
@@ -51,7 +51,7 @@ class SunLookingOrbit(ClassicOrbit):
             self.ZenitRotate = False
             return
         
-    def LookAtSun(self, sputnik : Sputnik):
+    def LookAtSun(self, sputnik : Sputnik): #разворот производится с помощью умножения матрицы вращения и нормали поверхностей пластин
         matrix = np.array([[1, 0, 0],
                            [0, np.cos(np.pi), -np.sin(np.pi)],
                            [0, np.sin(np.pi), np.cos(np.pi)]])

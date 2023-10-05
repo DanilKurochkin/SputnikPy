@@ -39,6 +39,7 @@ class Sputnik(): # спутник
         self.orbit = orbit
         self.time = np.float64(0)
         self.externalConditions = []
+        self.dtime = None
         #инициалируем стенки спутника
         for i in np.arange(self.boxes.size):
             self.boxes[i] = Box(0, width, self.size[i], material, i, self.default_orientation[i], coat, self)
@@ -71,7 +72,7 @@ class Sputnik(): # спутник
         file.write(format1.format(i, j, ht*j+i*self.orbit.period, self.orbit.getAlpha()))
         for box in self.boxes:
             file.write('\t')
-            for temper in box.T:
+            for temper in box.T[1 : box.T.size - 1]:
                 file.write(format2.format(temper))
             file.write('\n')
     
@@ -90,24 +91,24 @@ class Sputnik(): # спутник
 
         file.write('\n')
     
-    def writeInnerEnergy(self, file, startT):
+    def writeInnerEnergy(self, file, startT): #записывает итоговое изменение внутренней энергии
         format2 = '{0:13.3f} '
         for box in self.boxes:
-            for i in np.arange(box.T.size):
+            for i in np.arange(1, box.T.size - 1):
                 V = box.volumes[i].area * box.volumes[i].length
                 dU = box.volumes[i].material.p * box.volumes[i].material.c * V * (startT-box.T[i])
                 file.write(format2.format(dU))
             
             file.write('\n')
     
-    def boxesNextT(self, ht, a0, b, c, d, a, P, Q):
+    def boxesNextT(self, ht, a0, b, c, d, a, P, Q): # для улучшения сходимости итерируемся по пластинам последовательно
         for i in np.arange(self.boxes.size):
             self.boxes[i].iterT = self.boxes[i].T
         disperancy = 1000
         
         new_disp = np.empty(self.boxes.size, dtype=np.float64)
 
-        while disperancy > 10**(-3):
+        while disperancy > 10**(-3): #вычисляем с заданной точностью
             for i in np.arange(self.boxes.size):
                 self.boxes[i].prevIterT = self.boxes[i].iterT
             
@@ -119,7 +120,7 @@ class Sputnik(): # спутник
             disperancy = np.max(new_disp)
         
         for i in np.arange(self.boxes.size):
-            self.boxes[i].T = self.boxes[i].iterT
+            self.boxes[i].T = self.boxes[i].iterT 
     
     def solve(self, amountOfRounds : int, pointsInRounds : int, save_every : int, startT = 300,filePath = 'output.txt', radiation_check = False, HeatCheckPath = 'outputheat.txt'): #решаем численно всё для всех пластинок в спутнике
         n = self.boxes[0].T.size
@@ -132,7 +133,7 @@ class Sputnik(): # спутник
         P = np.empty(n, dtype=np.float64)
         Q = np.empty(n, dtype=np.float64)
         
-        ht = self.orbit.period/pointsInRounds
+        self.dtime = self.orbit.period/pointsInRounds
         
         self.SetStartT(startT)
         
@@ -142,19 +143,19 @@ class Sputnik(): # спутник
         
         for i in np.arange(amountOfRounds):
             for j in np.arange(pointsInRounds):
-                self.boxesNextT(ht, a0, b, c, d, a, P, Q)
+                self.boxesNextT(self.dtime, a0, b, c, d, a, P, Q)
                     
                 if radiation_check:
-                    self.writeHeat(file2, ht) 
+                    self.writeHeat(file2, self.dtime) 
 
                 if j % save_every == 0:
-                    self.writeResult(file, ht, i, j)
+                    self.writeResult(file, self.dtime, i, j)
                 
-                self.orbit.Move(ht, self)
+                self.orbit.Move(self.dtime, self)
                 for externalConditon in self.externalConditions:
                     externalConditon.rotate(self.orbit.getAlpha())
                 
-                self.time += ht
+                self.time += self.dtime
         
         if radiation_check:
             self.writeInnerEnergy(file2, startT)
@@ -214,19 +215,19 @@ class Box(): #родная коробочка
         self.connections = []
         self.neighbours : dict[Box, Box]
 
-    def createVolumes(self, h : np.float64): #нарезам всё на конечные объёмы
-        self.h = h
-        n = (np.arange(0, self.length+h/2, h)).size
+    def createVolumes(self, amount : int): #нарезам всё на конечные объёмы
+        self.h = self.length / amount
+        n = amount + 2
         self.volumes = np.empty(n, dtype=FiniteVolume)
         self.volumes : dict[FiniteVolume, FiniteVolume]
         self.T = np.empty(n, dtype=np.float64)
         
-        x = self.x
-        self.volumes[0] = FiniteVolume(x, h/2, self.area, self.material , self)
+        x = self.x - self.h/2
+        self.volumes[0] = FiniteVolume(x, self.h/2, self.area, self.material , self)
         for i in range(1, n-1):
             x += self.h
-            self.volumes[i] = FiniteVolume(x, h, self.area, self.material , self)
-        self.volumes[n-1] = FiniteVolume(x + self.h, h/2, self.area, self.material , self)
+            self.volumes[i] = FiniteVolume(x, self.h, self.area, self.material , self)
+        self.volumes[n-1] = FiniteVolume(x + self.h, self.h/2, self.area, self.material , self)
         Box.knitVolumes(self)
 
     def knitVolumes(self): #связываем конечные объёмы
@@ -292,7 +293,7 @@ class BoundaryCondition(): #граничное условие
     def ConnectionCoefs(box, T):
         fT = 0
         fp = 0
-        for connection in box.connections:
+        for connection in box.connections: #линеаризация
             fT += connection.heatFlux(T)
             fp += connection.derivative()
         
@@ -301,7 +302,7 @@ class BoundaryCondition(): #граничное условие
     def FindCoefsEx(box, conditions, T, a1): #вычисление коэфициентов для граничных условий
         fT = 0
         fp = 0
-        for cond in conditions:
+        for cond in conditions: #линеаризация
             fT += cond.heatFlux(box, T)    
             fp += cond.derivative(box, T)
         fc = fT - fp * T
@@ -313,7 +314,7 @@ class BoundaryCondition(): #граничное условие
     def FindCoefsEt(box, conditions, T,a1): #вычисление коэфициентов для граничных условий
         fT = 0
         fp = 0
-        for cond in conditions:
+        for cond in conditions: #линеаризация
             fT += cond.heatFlux(box, T)
             fp += cond.derivative(box, T)
         res = BoundaryCondition.ConnectionCoefs(box, T)

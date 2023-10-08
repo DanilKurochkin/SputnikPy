@@ -25,7 +25,7 @@ class Sputnik(): # спутник
                                     np.array([0, 1, 0]),
                                     np.array([0, -1, 0]),
                                     np.array([0, 0, 1]),
-                                    np.array([0, 0, -1])]) #дефолтная ориентация пластин для куба
+                                    np.array([0, 0, -1])]) #ориентация пластин для куба
     
     def __init__(self, Lx : np.float64, Ly : np.float64, Lz : np.float64, width : np.float64, material, coat, orbit):
         self.width = width #толщина спутника

@@ -26,7 +26,7 @@ class ClassicOrbit(): #орбита
     def Move(self, ht, sputnik : Sputnik): #измение позиции спутника
         self.position += ht*self.velocity
         if(self.position >= self.length):
-            self.position -= self.length
+            self.position = 0
          
 class SunLookingOrbit(ClassicOrbit): #разница между этой орбитой и классической в том, что спутник разворачивается по оси надир-зенит в полдень и полночь
     def __init__(self, radiusAboveEarth):
@@ -37,7 +37,7 @@ class SunLookingOrbit(ClassicOrbit): #разница между этой орб�
     def Move(self, ht, sputnik : Sputnik):
         self.position += ht*self.velocity
         if(self.position >= self.length):
-            self.position -= self.length
+            self.position = 0
         
         if self.NadirRotate and self.position>=self.length/2:
             self.LookAtSun(sputnik)

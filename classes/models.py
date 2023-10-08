@@ -108,7 +108,7 @@ class Sputnik(): # спутник
         
         new_disp = np.empty(self.boxes.size, dtype=np.float64)
 
-        while disperancy > 10**(-3): #вычисляем с заданной точностью
+        while disperancy > 10**(-1): #вычисляем с заданной точностью
             for i in np.arange(self.boxes.size):
                 self.boxes[i].prevIterT = self.boxes[i].iterT
             
@@ -217,12 +217,12 @@ class Box(): #родная коробочка
 
     def createVolumes(self, amount : int): #нарезам всё на конечные объёмы
         self.h = self.length / amount
-        n = amount + 2
+        n = amount
         self.volumes = np.empty(n, dtype=FiniteVolume)
         self.volumes : dict[FiniteVolume, FiniteVolume]
         self.T = np.empty(n, dtype=np.float64)
         
-        x = self.x - self.h/2
+        x = self.x
         self.volumes[0] = FiniteVolume(x, self.h/2, self.area, self.material , self)
         for i in range(1, n-1):
             x += self.h

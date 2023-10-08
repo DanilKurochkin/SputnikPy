@@ -17,6 +17,8 @@ T4 = []
 T5 = []
 T6 = []
 
+areas = [6,6,3,3,2,2]
+area = sum(areas)
 with open('output.txt', 'r') as f:
     while True:
         string = f.readline()
@@ -59,10 +61,11 @@ plt.legend()
 sumT = 0
 sumTrad = 0
 for i in range(len(T1)//2, len(T1)):
-    sumT += T1[i] + T2[i] + T3[i] + T4[i] + T5[i] + T6[i]
-    sumTrad += T1[i]**4 + T2[i]**4 + T3[i]**4 + T4[i]**4 + T5[i]**4 + T6[i]**4
-sumT /=(6*len(T1)//2)
-sumTrad /= (6*len(T1)//2)
+    sumT += areas[0]*T1[i] + areas[1]*T2[i] + areas[2]*T3[i] + areas[3]*T4[i] + areas[4]*T5[i] + areas[5]*T6[i]
+    sumTrad += areas[0]*T1[i]**4 + areas[1]*T2[i]**4 + areas[2]*T3[i]**4 + areas[3]*T4[i]**4 + areas[4]*T5[i]**4 + areas[5]*T6[i]**4
+sumT /=(len(T1)//2)
+sumT /= area
+sumTrad /= (area*len(T1)//2)
 sumTrad = sumTrad**0.25
 
 print(str(sumT),str(sumTrad))

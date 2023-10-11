@@ -100,7 +100,7 @@ class Connection(Load):
     
     def heatFlux(self, T):
         n = self.connectedBox.prevIterT.size - 1
-        q = (self.connectedBox.prevIterT[n]- T)/self.R
+        q = (self.connectedBox.prevIterT[n]- T)/self.R*(self.connectedBox.area/self.box.area)
         
         return q
     

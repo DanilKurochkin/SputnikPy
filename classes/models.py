@@ -14,9 +14,11 @@ class Sputnik(): # спутник
                                     np.array([0, 0, 1]),
                                     np.array([0, 0, -1])]) #дефолтная ориентация пластин для куба
     
-    def __init__(self, size : np.float64, width : np.float64, material : Material, coat : 'Coating', orbit : 'ClassicOrbit'):
+    def __init__(self, Lx, Ly, Lz, width : np.float64, material : Material, coat : 'Coating', orbit : 'ClassicOrbit'):
         self.width = width #толщина спутника
-        self.size = size #площадь пластинок
+        self.size = np.array([Ly*Lz, Ly*Lz,
+                     Lx*Lz, Lx*Lz,
+                     Lx*Ly, Lx*Ly]) #площадь пластинок
         self.boxes = np.empty(6, dtype=Box) 
         self.boxes : dict[Box, Box]
         self.coat = coat
@@ -25,7 +27,7 @@ class Sputnik(): # спутник
         self.externalConditions = []
         #инициалируем стенки спутника
         for i in np.arange(self.boxes.size):
-            self.boxes[i] = Box(0, width, size, material, i, self.default_orientation[i], coat, self)
+            self.boxes[i] = Box(0, width, self.size[i], material, i, self.default_orientation[i], coat, self)
     
     def knitPlates(self): #связываем пластины, чтобы знать какая с какой соприкасается
         for box in self.boxes:
@@ -41,10 +43,10 @@ class Sputnik(): # спутник
                         self.boxes[i].neighbours[z] = self.boxes[j]
                         z += 1
 
-    def createVolumes(self, h : np.float64): #нарезаем пластины спутника на конечные объёмы
+    def createVolumes(self, n : int): #нарезаем пластины спутника на конечные объёмы
         for box in self.boxes:
             box : Box
-            box.createVolumes(h)
+            box.createVolumes(n)
     
     def writeResult(self, file, ht, i, j): #запись результата в отдельный файл, результат это распределение температур внутри пластины, угол на котором находится объект
         format1 = '{0} {1} {2} {3}\n'
@@ -196,20 +198,20 @@ class Box(): #родная коробочка
         self.connections : list[wl.Connection]
         self.neighbours : dict[Box, Box]
 
-    def createVolumes(self, h : np.float64): #нарезам всё на конечные объёмы
+    def createVolumes(self, n : int): #нарезам всё на конечные объёмы
+        h = self.length/(n-2)
         self.h = h
-        n = (np.arange(0, self.length+h/2, h)).size
         self.volumes = np.empty(n, dtype=FiniteVolume)
         self.volumes : dict[FiniteVolume, FiniteVolume]
         self.T = np.empty(n, dtype=np.float64)
         
-        x = self.x
+        x = self.x - h/2
         self.volumes[0] = FiniteVolume(x, h/2, self.area, self.material , self)
         for i in range(1, n-1):
             x += self.h
             self.volumes[i] = FiniteVolume(x, h, self.area, self.material , self)
         self.volumes[n-1] = FiniteVolume(x + self.h, h/2, self.area, self.material , self)
-        Box.knitVolumes(self)
+        self.knitVolumes()
 
     def knitVolumes(self): #связываем конечные объёмы
         n = self.volumes.size

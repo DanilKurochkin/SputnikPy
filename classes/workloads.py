@@ -77,46 +77,6 @@ class Conditions(): #класс для нагрузок действующих �
         for obj in objects:
             self.ethernal.append(obj)
 
-
-class BoundaryCondition(): #граничное условие
-
-    def ConnectionCoefs(box, T):
-        fT = 0
-        fp = 0
-        for connection in box.connections:
-            fT += connection.heatFlux(T)
-            fp += connection.derivative()
-        
-        return fT, fp
-    
-    def FindCoefsEx(box, conditions, T, a1): #вычисление коэфициентов для граничных условий
-        fT = 0
-        fp = 0
-        for cond in conditions:
-            fT += cond.heatFlux(box, T)    
-            fp += cond.derivative(box, T)
-        fc = fT - fp * T
-        
-        a = a1 - fp
-        d = fc
-        return a, d
-    
-    def FindCoefsEt(box, conditions, T, a1): #вычисление коэфициентов для граничных условий
-        fT = 0
-        fp = 0
-        for cond in conditions:
-            fT += cond.heatFlux(box, T)
-            fp += cond.derivative(box, T)
-        res = BoundaryCondition.ConnectionCoefs(box, T)
-        fT += res[0]
-        fp += res[1]
-        
-        fc = fT - fp * T
-        
-        a = a1 -fp
-        d = fc
-        return a, d
-
 class Connect():
     def byNum(sputnik, num1, num2, R):
         sputnik.boxes[num1].connections.append(Connection(R, sputnik.boxes[num1],sputnik.boxes[num2]))

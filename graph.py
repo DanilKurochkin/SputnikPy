@@ -59,9 +59,9 @@ plt.legend()
 sumT = 0
 sumTrad = 0
 for i in range(len(T1)//2, len(T1)):
-    sumT += T1[i] + T2[i] + T3[i] + T4[i] + T5[i] + T6[i]
+    sumT += 6*T1[i] + 6*T2[i] + 3*T3[i] + 3*T4[i] + 2*T5[i] + 2*T6[i]
     sumTrad += T1[i]**4 + T2[i]**4 + T3[i]**4 + T4[i]**4 + T5[i]**4 + T6[i]**4
-sumT /=(6*len(T1)//2)
+sumT /=(22*len(T1)//2)
 sumTrad /= (6*len(T1)//2)
 sumTrad = sumTrad**0.25
 

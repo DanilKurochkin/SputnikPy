@@ -6,7 +6,7 @@ from classes.materials import Material, Coating
 import time
         
 def main():
-    A6061 = Material(1000, 3000, 202) #алюминий 6061
+    A6061 = Material(10000, 3000, 202) #алюминий 6061
     coat = Coating(0.4, 0.2) #ЭКОМ-1П a05 e04
     orbit = SunLookingOrbit(500)
     cond = wl.Conditions()
@@ -18,9 +18,9 @@ def main():
     cond.addEx(wl.Radiaton(), wl.Sun(1500))
     cond.addEt(wl.ConstantHeatFlux(500))
     sp.addCondition(cond)
-    wl.Connect.neighbours(sp, 0.1)
+    wl.Connect.neighbours(sp, 0.01)
     start = time.time()
-    sp.solve(60, 1000, 1, 450, radiation_check=True)
+    sp.solve(100, 100, 1, 450, radiation_check=True)
     end = time.time()
     
     print(end-start)

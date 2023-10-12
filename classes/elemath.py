@@ -18,5 +18,8 @@ def TDMA(a : npt.NDArray[np.float64], b : npt.NDArray[np.float64], c : npt.NDArr
 
 #вычисление невязки по отклонению от предыдущего решения
 def discrepancy(array1 : npt.NDArray[np.float64], array2 : npt.NDArray[np.float64]):
-    epsilon = np.abs(array1 - array2)
-    return np.max(epsilon)
+    n = array1.size
+    
+    epsilon = np.max(np.abs(array1-array2))
+    
+    return epsilon

@@ -1,24 +1,26 @@
 import numpy as np
-import classes.workloads as wl
-import time
-from classes.material import Coating, Material
-from classes.models import *
 from classes.orbits import SunLookingOrbit
-
+from classes.models import *
+import classes.workloads as wl
+from classes.materials import Material, Coating
+import time
+        
 def main():
-    A6061 = Material(900, 2700, 209) #алюминий 6061
-    coat = Coating(0.5, 0.6)
+    A6061 = Material(10000, 3000, 202) #алюминий 6061
+    coat = Coating(0.4, 0.2) #ЭКОМ-1П a05 e04
     orbit = SunLookingOrbit(500)
-    cond = Conditions()
-
-    sp = Sputnik(1, 2, 3, 0.001, A6061, coat, orbit)
-    sp.createVolumes(20)
+    cond = wl.Conditions()
+    
+    sp = Sputnik(1,2,3, 0.005, A6061, coat, orbit)
+    sp.createVolumes(7)
     sp.knitPlates()
-    wl.Connect.neighbours(sp, 0.1)
-    cond.addEx(wl.Sun(1500), wl.Radiaton())
+    
+    cond.addEx(wl.Radiaton(), wl.Sun(1500))
+    cond.addEt(wl.ConstantHeatFlux(500))
     sp.addCondition(cond)
+    wl.Connect.neighbours(sp, 0.01)
     start = time.time()
-    sp.solve(20, 1000, 1, 250, radiation_check=True)
+    sp.solve(100, 100, 1, 450, radiation_check=True)
     end = time.time()
     
     print(end-start)

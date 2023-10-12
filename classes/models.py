@@ -1,51 +1,33 @@
 import numpy as np
-from classes.material import Material, Coating
+from classes.materials import Coating, Material
+from classes.orbits import ClassicOrbit
 import classes.elemath as SMath
+import classes.workloads as wl
 import numpy.typing as npt
 
-class PlateCollector():
-        def __init__(self ,sputnik : 'Sputnik'):
-            self.zenit = sputnik.boxes[0]
-            self.zenit : 'Box'
-            self.nadir = sputnik.boxes[1]
-            self.nadir : 'Box'
-            self.ortogonal1 = sputnik.boxes[2]
-            self.ortogonal1 : 'Box'
-            self.ortogonal2 = sputnik.boxes[3]
-            self.ortogonal2 : 'Box'
-            self.shade = sputnik.boxes[4]
-            self.shade : 'Box'
-            self.solar = sputnik.boxes[5]
-            self.solar : 'Box'
-
 class Sputnik(): # спутник
-    
+
     default_orientation = np.array([np.array([1, 0 , 0]),
                                     np.array([-1, 0, 0]),
                                     np.array([0, 1, 0]),
                                     np.array([0, -1, 0]),
                                     np.array([0, 0, 1]),
-                                    np.array([0, 0, -1])]) #ориентация пластин для куба
+                                    np.array([0, 0, -1])]) #дефолтная ориентация пластин для куба
     
-    def __init__(self, Lx : np.float64, Ly : np.float64, Lz : np.float64, width : np.float64, material, coat, orbit):
+    def __init__(self, Lx, Ly, Lz, width : np.float64, material : Material, coat : 'Coating', orbit : 'ClassicOrbit'):
         self.width = width #толщина спутника
-        self.size = [Ly*Lz, Ly*Lz,
+        self.size = np.array([Ly*Lz, Ly*Lz,
                      Lx*Lz, Lx*Lz,
-                     Lx*Ly, Lx*Ly] #площадь пластинок
+                     Lx*Ly, Lx*Ly]) #площадь пластинок
         self.boxes = np.empty(6, dtype=Box) 
         self.boxes : dict[Box, Box]
         self.coat = coat
-        self.coat : 'Coating'
         self.orbit = orbit
-        self.time = np.float64(0)
+        
         self.externalConditions = []
-        self.dtime = None
         #инициалируем стенки спутника
         for i in np.arange(self.boxes.size):
             self.boxes[i] = Box(0, width, self.size[i], material, i, self.default_orientation[i], coat, self)
-        self.plate = PlateCollector(self)
-        self.plate : PlateCollector
-        
     
     def knitPlates(self): #связываем пластины, чтобы знать какая с какой соприкасается
         for box in self.boxes:
@@ -61,10 +43,10 @@ class Sputnik(): # спутник
                         self.boxes[i].neighbours[z] = self.boxes[j]
                         z += 1
 
-    def createVolumes(self, h : np.float64): #нарезаем пластины спутника на конечные объёмы
+    def createVolumes(self, n : int): #нарезаем пластины спутника на конечные объёмы
         for box in self.boxes:
             box : Box
-            box.createVolumes(h)
+            box.createVolumes(n)
     
     def writeResult(self, file, ht, i, j): #запись результата в отдельный файл, результат это распределение температур внутри пластины, угол на котором находится объект
         format1 = '{0} {1} {2} {3}\n'
@@ -72,7 +54,7 @@ class Sputnik(): # спутник
         file.write(format1.format(i, j, ht*j+i*self.orbit.period, self.orbit.getAlpha()))
         for box in self.boxes:
             file.write('\t')
-            for temper in box.T[1 : box.T.size - 1]:
+            for temper in box.T:
                 file.write(format2.format(temper))
             file.write('\n')
     
@@ -91,24 +73,24 @@ class Sputnik(): # спутник
 
         file.write('\n')
     
-    def writeInnerEnergy(self, file, startT): #записывает итоговое изменение внутренней энергии
+    def writeInnerEnergy(self, file, startT):
         format2 = '{0:13.3f} '
         for box in self.boxes:
-            for i in np.arange(1, box.T.size - 1):
+            for i in np.arange(box.T.size):
                 V = box.volumes[i].area * box.volumes[i].length
                 dU = box.volumes[i].material.p * box.volumes[i].material.c * V * (startT-box.T[i])
                 file.write(format2.format(dU))
             
             file.write('\n')
     
-    def boxesNextT(self, ht, a0, b, c, d, a, P, Q): # для улучшения сходимости итерируемся по пластинам последовательно
+    def boxesNextT(self, ht, a0, b, c, d, a, P, Q):
         for i in np.arange(self.boxes.size):
             self.boxes[i].iterT = self.boxes[i].T
         disperancy = 1000
         
         new_disp = np.empty(self.boxes.size, dtype=np.float64)
-
-        while disperancy > 10**(-1): #вычисляем с заданной точностью
+        
+        while disperancy > 10**(-2):
             for i in np.arange(self.boxes.size):
                 self.boxes[i].prevIterT = self.boxes[i].iterT
             
@@ -120,9 +102,9 @@ class Sputnik(): # спутник
             disperancy = np.max(new_disp)
         
         for i in np.arange(self.boxes.size):
-            self.boxes[i].T = self.boxes[i].iterT 
+            self.boxes[i].T = self.boxes[i].iterT
     
-    def solve(self, amountOfRounds : int, pointsInRounds : int, save_every : int, startT = 300,filePath = 'output.txt', radiation_check = False, HeatCheckPath = 'outputheat.txt'): #решаем численно всё для всех пластинок в спутнике
+    def solve(self, amountOfRounds : int, pointsInRounds : int, save_every, startT = 300,filePath = 'output.txt', radiation_check = False, HeatCheckPath = 'outputheat.txt'): #решаем численно всё для всех пластинок в спутнике
         n = self.boxes[0].T.size
 
         a0 = np.empty(n, dtype=np.float64) #чтобы лишний раз много памяти не выделять
@@ -133,7 +115,7 @@ class Sputnik(): # спутник
         P = np.empty(n, dtype=np.float64)
         Q = np.empty(n, dtype=np.float64)
         
-        self.dtime = self.orbit.period/pointsInRounds
+        ht = self.orbit.period/pointsInRounds
         
         self.SetStartT(startT)
         
@@ -143,19 +125,17 @@ class Sputnik(): # спутник
         
         for i in np.arange(amountOfRounds):
             for j in np.arange(pointsInRounds):
-                self.boxesNextT(self.dtime, a0, b, c, d, a, P, Q)
+                self.boxesNextT(ht, a0, b, c, d, a, P, Q)
                     
                 if radiation_check:
-                    self.writeHeat(file2, self.dtime) 
+                    self.writeHeat(file2, ht) 
 
                 if j % save_every == 0:
-                    self.writeResult(file, self.dtime, i, j)
+                    self.writeResult(file, ht, i, j)
                 
-                self.orbit.Move(self.dtime, self)
+                self.orbit.Move(ht, self)
                 for externalConditon in self.externalConditions:
                     externalConditon.rotate(self.orbit.getAlpha())
-                
-                self.time += self.dtime
         
         if radiation_check:
             self.writeInnerEnergy(file2, startT)
@@ -171,7 +151,7 @@ class Sputnik(): # спутник
                 box.T[i] = startT
         self.newContactT()
     
-    def addCondition(self, condition): #добавление граничного условия для всех пластин, то есть того, которое будет действовать на все пластины
+    def addCondition(self, condition : wl.Conditions): #добавление граничного условия для всех пластин, то есть того, которое будет действовать на все пластины
         for box in self.boxes:
             for ethernal in condition.ethernal:
                 box.conditions.addEt(ethernal)
@@ -182,7 +162,7 @@ class Sputnik(): # спутник
         for external in condition.external:
             self.externalConditions.append(external)
     
-    def addConditionByNum(self, condition, *nums): # аналогично выше описанному методу, но добавляет только для конкретных пластин
+    def addConditionByNum(self, condition : wl.Conditions, *nums): # аналогично выше описанному методу, но добавляет только для конкретных пластин
         for num in nums:
             for ethernal in condition.ethernal:
                 self.boxes[num].conditions.addEt(ethernal)
@@ -192,6 +172,7 @@ class Sputnik(): # спутник
                 
         for external in condition.external:
             self.externalConditions.append(external)
+    
     
 class Box(): #родная коробочка
     
@@ -205,7 +186,8 @@ class Box(): #родная коробочка
         self.coat = coat
         self.parent = parent
 
-        self.conditions = Conditions()
+        self.conditions = wl.Conditions()
+        self.conditions : wl.Conditions
         self.T = []
         self.iterT = []
         self.prevIterT = []
@@ -213,22 +195,23 @@ class Box(): #родная коробочка
         self.h = []
         self.neighbours = []
         self.connections = []
+        self.connections : list[wl.Connection]
         self.neighbours : dict[Box, Box]
 
-    def createVolumes(self, amount : int): #нарезам всё на конечные объёмы
-        self.h = self.length / amount
-        n = amount
+    def createVolumes(self, n : int): #нарезам всё на конечные объёмы
+        h = self.length/(n-2)
+        self.h = h
         self.volumes = np.empty(n, dtype=FiniteVolume)
         self.volumes : dict[FiniteVolume, FiniteVolume]
         self.T = np.empty(n, dtype=np.float64)
         
-        x = self.x
-        self.volumes[0] = FiniteVolume(x, self.h/2, self.area, self.material , self)
+        x = self.x - h/2
+        self.volumes[0] = FiniteVolume(x, h/2, self.area, self.material , self)
         for i in range(1, n-1):
             x += self.h
-            self.volumes[i] = FiniteVolume(x, self.h, self.area, self.material , self)
-        self.volumes[n-1] = FiniteVolume(x + self.h, self.h/2, self.area, self.material , self)
-        Box.knitVolumes(self)
+            self.volumes[i] = FiniteVolume(x, h, self.area, self.material , self)
+        self.volumes[n-1] = FiniteVolume(x + self.h, h/2, self.area, self.material , self)
+        self.knitVolumes()
 
     def knitVolumes(self): #связываем конечные объёмы
         n = self.volumes.size
@@ -275,25 +258,12 @@ class FiniteVolume(): #конечный объём и его характери�
         self.onLeftEdge = onLeftEdge
         self.onRightEdge = onRightEdge
 
-class Conditions(): #класс для нагрузок действующих на спутник
-    def __init__(self):
-        self.external = []
-        self.ethernal = []
-        
-    def addEx(self, *objects):
-        for obj in objects:
-            self.external.append(obj)
-    
-    def addEt(self, *objects):
-        for obj in objects:
-            self.ethernal.append(obj)
-            
 class BoundaryCondition(): #граничное условие
 
     def ConnectionCoefs(box, T):
         fT = 0
         fp = 0
-        for connection in box.connections: #линеаризация
+        for connection in box.connections:
             fT += connection.heatFlux(T)
             fp += connection.derivative()
         
@@ -302,7 +272,7 @@ class BoundaryCondition(): #граничное условие
     def FindCoefsEx(box, conditions, T, a1): #вычисление коэфициентов для граничных условий
         fT = 0
         fp = 0
-        for cond in conditions: #линеаризация
+        for cond in conditions:
             fT += cond.heatFlux(box, T)    
             fp += cond.derivative(box, T)
         fc = fT - fp * T
@@ -311,10 +281,10 @@ class BoundaryCondition(): #граничное условие
         d = fc
         return a, d
     
-    def FindCoefsEt(box, conditions, T,a1): #вычисление коэфициентов для граничных условий
+    def FindCoefsEt(box, conditions, T, a1): #вычисление коэфициентов для граничных условий
         fT = 0
         fp = 0
-        for cond in conditions: #линеаризация
+        for cond in conditions:
             fT += cond.heatFlux(box, T)
             fp += cond.derivative(box, T)
         res = BoundaryCondition.ConnectionCoefs(box, T)

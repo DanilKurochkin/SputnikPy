@@ -23,7 +23,7 @@ def extractcol(l):
         n_l.append(np.average(items))
     return n_l
 
-for i in range(1):
+for i in range(len(labels)):
     plt.plot(t, extractcol(T[i]), color = colors[i], label = labels[i])
 
 plt.xlabel('Время [c]')

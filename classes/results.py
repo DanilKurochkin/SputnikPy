@@ -1,6 +1,6 @@
 import numpy as np
 
-class Cheker():
+class Checker():
     def radiationCheck():
         with open('outputheat.txt', 'r') as f:
             r = f.read().rsplit()

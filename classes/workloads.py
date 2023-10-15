@@ -15,9 +15,15 @@ class Load(ABC): #Базовый функционал для любой нагр
         pass
     
     def heat(self, box : Box, T): #общий для всех наследников метод вычисления количества теплоты попадающего на пластину за секунду
-        Q = self.heatFlux(box, T) * box.area
+        if not self.timeDependent():
+            Q = self.heatFlux(box, T) * box.area
+        else:
+            Q = self.heatFlux(box, box.parent.time) * box.area
         
         return Q
+    
+    def timeDependent(self):
+        return False
     
     def derivative(self, box : Box, T): #Производная теплового потока потока по температуре, определяется наследником
         return 0
@@ -67,29 +73,29 @@ class Isolated(Load): #изолированная сторона
 
 class Connect(): #Служебный класс для соединения пластин
     def byNum(sputnik : 'Sputnik', num1, num2, R):
-        sputnik.boxes[num1].connections.append(Connection(R, sputnik.boxes[num1],sputnik.boxes[num2]))
-        sputnik.boxes[num2].connections.append(Connection(R, sputnik.boxes[num2],sputnik.boxes[num1]))
+        sputnik.boxes[num1].conditions.addEt(Connection(R, sputnik.boxes[num1],sputnik.boxes[num2]))
+        sputnik.boxes[num2].conditions.addEt(Connection(R, sputnik.boxes[num2],sputnik.boxes[num1]))
     
     def byBox(box1 : 'Box', box2 : 'Box', R):
         if(box1.parent is not box2.parent):
             raise ValueError
-        box1.connections.append(Connect(R, box1, box2))
-        box1.connections.append(Connect(R, box2, box1))
+        box1.conditions.addEt(Connect(R, box1, box2))
+        box1.conditions.addEt(Connect(R, box2, box1))
     
-    def neighbours(sputnik, R):
+    def neighbours(sputnik : Sputnik, R):
         for box in sputnik.boxes:
             for neighbour in box.neighbours:
-                box.connections.append(Connection(R ,box, neighbour))
+                box.conditions.addEt(Connection(R ,box, neighbour))
     
     def byHeatPipeByNum(sputnik : Sputnik, num1, num2, R, maxHeatFlux):
-        sputnik.boxes[num1].connections.append(HeatPipe(R, sputnik.boxes[num1], sputnik.boxes[num2], maxHeatFlux))
-        sputnik.boxes[num2].connections.append(HeatPipe(R, sputnik.boxes[num2], sputnik.boxes[num1], maxHeatFlux))
+        sputnik.boxes[num1].conditions.addEt(HeatPipe(R, sputnik.boxes[num1], sputnik.boxes[num2], maxHeatFlux))
+        sputnik.boxes[num2].conditions.addEt(HeatPipe(R, sputnik.boxes[num2], sputnik.boxes[num1], maxHeatFlux))
     
     def byHeatPipeByBox(box1 : 'Box', box2 : 'Box', R):
         if(box1.parent is not box2.parent):
             raise ValueError
-        box1.connections.append(HeatPipe(R, box1, box2))
-        box1.connections.append(HeatPipe(R, box2, box1))
+        box1.conditions.addEt(HeatPipe(R, box1, box2))
+        box1.conditions.addEt(HeatPipe(R, box2, box1))
 
 class Connection(Load): #Класс термического контакта
     
@@ -98,18 +104,18 @@ class Connection(Load): #Класс термического контакта
         self.box = box
         self.connectedBox = connectedBox
     
-    def heatFlux(self, T): #Температура берётся с предыдущий итерации, так как если брать с текущей, то закон сохранения нарушится
+    def heatFlux(self, box, T): #Температура берётся с предыдущий итерации, так как если брать с текущей, то закон сохранения нарушится
         n = self.connectedBox.prevIterT.size - 1
         q = (self.connectedBox.prevIterT[n]- T)/self.R * (self.connectedBox.area / self.box.area)
         
         return q
     
-    def heat(self, T):
-        Q = self.heatFlux(T) * self.box.area
+    def heat(self, box, T):
+        Q = self.heatFlux(box, T) * self.box.area
         
         return Q
     
-    def derivative(self):
+    def derivative(self, box, t):
         return -1/self.R
 
 class EarthRadiation(Load): #Земное излучение
@@ -179,59 +185,37 @@ class HeatPipe(Connection): #Тепловая трубка
         return q
     
 class TableFunctionLoadFlux(Load): #Тепловой поток задаваемый табличной функцией
-    def integrator(self, time, dtime, dots): #интегрирует тепловой поток по точкам изгиба на заданном отрезке
-        result = np.float64(0)
-        leftEdgeTime = time
-        leftEdgeHeat = np.interp(time, self.timePoints, self.heatPoints)
-        
-        rightEdgeTime, rightEdgeHeat = None, None
-        for i in np.arange(dots.size): # так как между точками функция между точками представляет собой линию, площадь под линией можно посчитать по формуле площади прямоугольников
-            rightEdgeTime = dots[i]
-            rightEdgeHeat = np.interp(rightEdgeTime, self.timePoints, self.heatPoints)
-            result += (rightEdgeHeat + leftEdgeHeat) * (rightEdgeTime-leftEdgeTime) / 2
-            leftEdgeTime = rightEdgeTime
-            leftEdgeHeat = rightEdgeHeat
-        
-        rightEdgeTime = time + dtime
-        rightEdgeHeat = np.interp(rightEdgeTime, self.timePoints, self.heatPoints)
-        
-        result += (rightEdgeHeat + leftEdgeHeat) * (rightEdgeTime-leftEdgeTime) / 2
-        
-        return result / dtime
-
     def __init__(self, heatPoints, timePoints): 
-        self.heatPoints = heatPoints
-        self.timePoints = timePoints
+        self.heatPoints = np.array(heatPoints)
+        self.timePoints = np.array(timePoints)
     
-    def calculator(self, time, dtime):
-        dots = self.timePoints[ (time<self.timePoints) & (self.timePoints<(time+dtime)) ]
-        if(dots.size > 0): # если нет точек искривления, то можно просто взять среднее на отрезке
-            return self.integrator(time, dtime, dots)
-        else:
-            return np.interp(time + dtime/2, self.timePoints, self.heatPoints)
+    def timeDependent(self):
+        return True
     
-    def heatFlux(self, box, T):
-        result = self.calculator(box.parent.time, box.parent.dtime)
+    def heatFlux(self, box, t):
+        result = np.interp(t, self.timePoints, self.heatPoints)
         return result
-
-class TableFunctionLoadHeat(TableFunctionLoadFlux): # тоже самое но для теплоты в секунду
-    def __init__(self, heatPoints, timePoints):
-        super().__init__(heatPoints, timePoints)
-    
-    def heatFlux(self, box, T):
-        return super().heatFlux(box, T)/box.area
 
 class TableFunctionPeriodicalFlux(TableFunctionLoadFlux): # таблица закцикленная периодечки сама на себя
     def __init__(self, heatPoints, timePoints, period):
         super().__init__(heatPoints, timePoints)
         self.period = period
     
-    def heatFlux(self, box : Box, T):
-        return self.calculator(box.parent.time % self.period, box.parent.dtime)
+    def heatFlux(self, box, t):
+        t = t % self.period
+        result = super().heatFlux(box, t)
+        return result        
+
+class TableFunctionLoadHeat(TableFunctionLoadFlux): # тоже самое но для теплоты в секунду
+    def __init__(self, heatPoints, timePoints):
+        super().__init__(heatPoints, timePoints)
+    
+    def heatFlux(self, box, t):
+        return super().heatFlux(box, t)/box.area
 
 class TableFunctionPeriodicalHeat(TableFunctionPeriodicalFlux): # тоже самое но для теплоты в секунду
     def __init__(self, heatPoints, timePoints, period):
         super().__init__(heatPoints, timePoints, period)
     
-    def heatFlux(self, box, T):
-        return super().heatFlux(box, T)/box.area
+    def heatFlux(self, box, t):
+        return super().heatFlux(box, t)/box.area

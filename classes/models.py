@@ -1,8 +1,6 @@
 import numpy as np
-from classes.materials import Coating, Material
-from classes.orbits import ClassicOrbit
+from classes.material import Coating, Material
 import classes.elemath as SMath
-import classes.workloads as wl
 import numpy.typing as npt
 
 class Sputnik(): # спутник
@@ -14,15 +12,18 @@ class Sputnik(): # спутник
                                     np.array([0, 0, 1]),
                                     np.array([0, 0, -1])]) #дефолтная ориентация пластин для куба
     
-    def __init__(self, Lx, Ly, Lz, width : np.float64, material : Material, coat : 'Coating', orbit : 'ClassicOrbit'):
+    def __init__(self, Lx, Ly, Lz, width : np.float64, material : Material, coat : 'Coating', orbit):
         self.width = width #толщина спутника
         self.size = np.array([Ly*Lz, Ly*Lz,
-                     Lx*Lz, Lx*Lz,
-                     Lx*Ly, Lx*Ly]) #площадь пластинок
+                                Lx*Lz, Lx*Lz,
+                                Lx*Ly, Lx*Ly]) #площадь пластинок
         self.boxes = np.empty(6, dtype=Box) 
         self.boxes : dict[Box, Box]
         self.coat = coat
         self.orbit = orbit
+        
+        self.ht = None
+        self.time = None
         
         self.externalConditions = []
         #инициалируем стенки спутника
@@ -66,9 +67,6 @@ class Sputnik(): # спутник
             
             for ethernal in box.conditions.ethernal:
                 file.write(format2.format(ethernal.heat(box, box.T[box.T.size-1]) * ht))
-            
-            for connect in box.connections:
-                file.write(format2.format(connect.heat(box.T[box.T.size-1]) * ht))
             file.write('\n')
 
         file.write('\n')
@@ -115,8 +113,8 @@ class Sputnik(): # спутник
         P = np.empty(n, dtype=np.float64)
         Q = np.empty(n, dtype=np.float64)
         
-        ht = self.orbit.period/pointsInRounds
-        
+        self.ht = self.orbit.period/pointsInRounds
+        self.time = 0
         self.SetStartT(startT)
         
         file = open(filePath, 'w+')
@@ -125,17 +123,18 @@ class Sputnik(): # спутник
         
         for i in np.arange(amountOfRounds):
             for j in np.arange(pointsInRounds):
-                self.boxesNextT(ht, a0, b, c, d, a, P, Q)
+                self.boxesNextT(self.ht, a0, b, c, d, a, P, Q)
                     
                 if radiation_check:
-                    self.writeHeat(file2, ht) 
+                    self.writeHeat(file2, self.ht) 
 
                 if j % save_every == 0:
-                    self.writeResult(file, ht, i, j)
+                    self.writeResult(file, self.ht, i, j)
                 
-                self.orbit.Move(ht, self)
+                self.orbit.Move(self.ht, self)
                 for externalConditon in self.externalConditions:
                     externalConditon.rotate(self.orbit.getAlpha())
+                self.time += self.ht
         
         if radiation_check:
             self.writeInnerEnergy(file2, startT)
@@ -151,7 +150,7 @@ class Sputnik(): # спутник
                 box.T[i] = startT
         self.newContactT()
     
-    def addCondition(self, condition : wl.Conditions): #добавление граничного условия для всех пластин, то есть того, которое будет действовать на все пластины
+    def addCondition(self, condition : 'Conditions'): #добавление граничного условия для всех пластин, то есть того, которое будет действовать на все пластины
         for box in self.boxes:
             for ethernal in condition.ethernal:
                 box.conditions.addEt(ethernal)
@@ -162,7 +161,7 @@ class Sputnik(): # спутник
         for external in condition.external:
             self.externalConditions.append(external)
     
-    def addConditionByNum(self, condition : wl.Conditions, *nums): # аналогично выше описанному методу, но добавляет только для конкретных пластин
+    def addConditionByNum(self, condition : 'Conditions', *nums): # аналогично выше описанному методу, но добавляет только для конкретных пластин
         for num in nums:
             for ethernal in condition.ethernal:
                 self.boxes[num].conditions.addEt(ethernal)
@@ -171,9 +170,8 @@ class Sputnik(): # спутник
                 self.boxes[num].conditions.addEx(external)
                 
         for external in condition.external:
-            self.externalConditions.append(external)
-    
-    
+            self.externalConditions.append(external) 
+   
 class Box(): #родная коробочка
     
     def __init__(self, x: np.float64, length: np.float64, area : np.float64, material: Material, number, orientation, coat : 'Coating', parent : Sputnik ):
@@ -185,17 +183,15 @@ class Box(): #родная коробочка
         self.orientation = orientation
         self.coat = coat
         self.parent = parent
-
-        self.conditions = wl.Conditions()
-        self.conditions : wl.Conditions
+        self.parent : Sputnik
+        self.conditions = Conditions()
+        self.conditions : Conditions
         self.T = []
         self.iterT = []
         self.prevIterT = []
         self.contactT = []
         self.h = []
         self.neighbours = []
-        self.connections = []
-        self.connections : list[wl.Connection]
         self.neighbours : dict[Box, Box]
 
     def createVolumes(self, n : int): #нарезам всё на конечные объёмы
@@ -232,12 +228,12 @@ class Box(): #родная коробочка
         #вычисляем коэициенты для вектора температур self.T
         c[0] = 0 #Так всегда, из-за того что матрица трёхдиагональная
         b[0] = self.volumes[0].rightNeighbour.material.k/self.volumes[0].parent.h
-        a[0], d[0] = BoundaryCondition.FindCoefsEt(self, self.conditions.external, self.iterT[0], b[0])
+        a[0], d[0] = BoundaryCondition.FindCoefs(self, self.conditions.external, self.iterT[0], b[0])
         FindKoef(self, a0, b, c, d, a)
         size = a0.size
         b[size-1] = 0 #Так всегда, аналогично тому что выше
         c[size-1] = self.volumes[size-1].leftNeighbour.material.k/self.volumes[size-1].parent.h
-        a[size-1], d[size-1] = BoundaryCondition.FindCoefsEx(self, self.conditions.ethernal, self.iterT[size-1], c[size-1])
+        a[size-1], d[size-1] = BoundaryCondition.FindCoefs(self, self.conditions.ethernal, self.iterT[size-1], c[size-1])
         #вычислили коэфициенты 
         
         self.iterT = SMath.TDMA(a, b, c, d, P, Q) # решили методом простой прогонки и обновили вектор температур
@@ -258,40 +254,42 @@ class FiniteVolume(): #конечный объём и его характери�
         self.onLeftEdge = onLeftEdge
         self.onRightEdge = onRightEdge
 
-class BoundaryCondition(): #граничное условие
+class Conditions(): #класс для нагрузок действующих на спутник
+    def __init__(self):
+        self.external = []
+        self.ethernal = []
+        
+    def addEx(self, *objects):
+        for obj in objects:
+            self.external.append(obj)
+    
+    def addEt(self, *objects):
+        for obj in objects:
+            self.ethernal.append(obj)
 
-    def ConnectionCoefs(box, T):
-        fT = 0
-        fp = 0
-        for connection in box.connections:
-            fT += connection.heatFlux(T)
-            fp += connection.derivative()
+class BoundaryCondition(): #граничное условие
+    def integrateTime(condtion, box, time, dtime):
+        result = condtion.heatFlux(box, time + dtime) + condtion.heatFlux(box, time)
+        result /= 2
         
-        return fT, fp
+        return result
     
-    def FindCoefsEx(box, conditions, T, a1): #вычисление коэфициентов для граничных условий
+    def linearize(box : Box, conditions, T):
         fT = 0
         fp = 0
         for cond in conditions:
-            fT += cond.heatFlux(box, T)    
-            fp += cond.derivative(box, T)
+            if not cond.timeDependent():
+                fT += cond.heatFlux(box, T)    
+                fp += cond.derivative(box, T)
+            else:
+                fT += BoundaryCondition.integrateTime(cond, box, box.parent.time, box.parent.ht)
+        
         fc = fT - fp * T
         
-        a = a1 - fp
-        d = fc
-        return a, d
+        return fp, fc
     
-    def FindCoefsEt(box, conditions, T, a1): #вычисление коэфициентов для граничных условий
-        fT = 0
-        fp = 0
-        for cond in conditions:
-            fT += cond.heatFlux(box, T)
-            fp += cond.derivative(box, T)
-        res = BoundaryCondition.ConnectionCoefs(box, T)
-        fT += res[0]
-        fp += res[1]
-        
-        fc = fT - fp * T
+    def FindCoefs(box, conditions, T, a1): #вычисление коэфициентов для граничных условий
+        fp, fc = BoundaryCondition.linearize(box, conditions, T)
         
         a = a1 -fp
         d = fc

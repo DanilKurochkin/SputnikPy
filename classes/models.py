@@ -2,6 +2,7 @@ import numpy as np
 from classes.material import Coating, Material
 import classes.elemath as SMath
 import numpy.typing as npt
+from typing import List
 
 class Sputnik(): # спутник
 
@@ -17,41 +18,39 @@ class Sputnik(): # спутник
         self.size = np.array([Ly*Lz, Ly*Lz,
                                 Lx*Lz, Lx*Lz,
                                 Lx*Ly, Lx*Ly]) #площадь пластинок
-        self.boxes = np.empty(6, dtype=Box) 
-        self.boxes : dict[Box, Box]
+        self.boxes : List[Box] = []
         self.coat = coat
         self.orbit = orbit
-        
+        self.boxes
         self.ht = None
         self.time = None
         
         self.externalConditions = []
         #инициалируем стенки спутника
-        for i in np.arange(self.boxes.size):
-            self.boxes[i] = Box(0, width, self.size[i], material, i, self.default_orientation[i], coat, self)
+        for i in np.arange(6):
+            self.boxes.append(Box(0, width, self.size[i], material, i, self.default_orientation[i], coat, self))
     
     def knitPlates(self): #связываем пластины, чтобы знать какая с какой соприкасается
         for box in self.boxes:
-            box : Box
-            box.neighbours = np.empty(4, dtype=Box)
+            box.neighbours = []
         
-        for i in np.arange(self.boxes.size):
+        for i in np.arange(len(self.boxes)):
             z = 0
-            for j in np.arange(self.boxes.size):
+            for j in np.arange(len(self.boxes)):
                 if i != j:
                     if np.dot(self.boxes[i].orientation, self.boxes[j].orientation) == 0:
-                        self.boxes : dict[Box, Box]
-                        self.boxes[i].neighbours[z] = self.boxes[j]
+                        self.boxes : list[Box]
+                        self.boxes[i].neighbours.append(self.boxes[j])
                         z += 1
 
     def createVolumes(self, n : int): #нарезаем пластины спутника на конечные объёмы
         for box in self.boxes:
-            box : Box
             box.createVolumes(n)
     
     def writeResult(self, file, ht, i, j): #запись результата в отдельный файл, результат это распределение температур внутри пластины, угол на котором находится объект
         format1 = '{0} {1} {2} {3}\n'
         format2 = '{0:13.3f} '
+        j += 1
         file.write(format1.format(i, j, ht*j+i*self.orbit.period, self.orbit.getAlpha()))
         for box in self.boxes:
             file.write('\t')
@@ -82,24 +81,24 @@ class Sputnik(): # спутник
             file.write('\n')
     
     def boxesNextT(self, ht, a0, b, c, d, a, P, Q):
-        for i in np.arange(self.boxes.size):
+        for i in np.arange(len(self.boxes)):
             self.boxes[i].iterT = self.boxes[i].T
         disperancy = 1000
         
-        new_disp = np.empty(self.boxes.size, dtype=np.float64)
+        new_disp = np.empty(len(self.boxes), dtype=np.float64)
         
         while disperancy > 10**(-2):
-            for i in np.arange(self.boxes.size):
+            for i in np.arange(len(self.boxes)):
                 self.boxes[i].prevIterT = self.boxes[i].iterT
             
-            for i in np.arange(self.boxes.size):
+            for i in np.arange(len(self.boxes)):
                 self.boxes[i].iter(ht, a0, b, c, d, a, P, Q)
 
-            for i in np.arange(self.boxes.size):
+            for i in np.arange(len(self.boxes)):
                 new_disp[i] = SMath.discrepancy(self.boxes[i].iterT, self.boxes[i].prevIterT)
             disperancy = np.max(new_disp)
         
-        for i in np.arange(self.boxes.size):
+        for i in np.arange(len(self.boxes)):
             self.boxes[i].T = self.boxes[i].iterT
     
     def solve(self, amountOfRounds : int, pointsInRounds : int, save_every, startT = 300,filePath = 'output.txt', radiation_check = False, HeatCheckPath = 'outputheat.txt'): #решаем численно всё для всех пластинок в спутнике
@@ -181,36 +180,32 @@ class Box(): #родная коробочка
         self.area = area
         self.number = number
         self.orientation = orientation
-        self.coat = coat
-        self.parent = parent
-        self.parent : Sputnik
-        self.conditions = Conditions()
-        self.conditions : Conditions
+        self.coat : Coating = coat
+        self.parent : Sputnik = parent
+        self.conditions : Conditions = Conditions()
         self.T = []
         self.iterT = []
         self.prevIterT = []
         self.contactT = []
         self.h = []
-        self.neighbours = []
-        self.neighbours : dict[Box, Box]
+        self.neighbours : list[Box] = []
 
     def createVolumes(self, n : int): #нарезам всё на конечные объёмы
         h = self.length/(n-2)
         self.h = h
-        self.volumes = np.empty(n, dtype=FiniteVolume)
-        self.volumes : dict[FiniteVolume, FiniteVolume]
+        self.volumes : list[FiniteVolume] = []
         self.T = np.empty(n, dtype=np.float64)
         
-        x = self.x - h/2
-        self.volumes[0] = FiniteVolume(x, h/2, self.area, self.material , self)
+        x = self.x
+        self.volumes.append(FiniteVolume(x, h, None, 0, self.area, self.material , self))
         for i in range(1, n-1):
             x += self.h
-            self.volumes[i] = FiniteVolume(x, h, self.area, self.material , self)
-        self.volumes[n-1] = FiniteVolume(x + self.h, h/2, self.area, self.material , self)
+            self.volumes.append(FiniteVolume(x, h, h, h, self.area, self.material , self))
+        self.volumes.append(FiniteVolume(x + h, None, h, 0, self.area, self.material , self))
         self.knitVolumes()
 
     def knitVolumes(self): #связываем конечные объёмы
-        n = self.volumes.size
+        n = len(self.volumes)
         self.volumes[0].knit([], self.volumes[1], True, False)
         for i in np.arange(1, n-1):
             self.volumes[i].knit(self.volumes[i-1], self.volumes[i+1], False, False)
@@ -219,32 +214,34 @@ class Box(): #родная коробочка
     def iter(self, ht, a0, b, c, d, a, P, Q): #итерация
         def FindKoef(self : Box ,a0 : npt.NDArray[np.float64], b : npt.NDArray[np.float64], c : npt.NDArray[np.float64], d : npt.NDArray[np.float64] , a : npt.NDArray[np.float64]):
             for  i in np.arange(1, a0.size-1):
-                a0[i] = self.volumes[i].material.p*self.volumes[i].material.c*self.volumes[i].length/ht
-                b[i] = self.volumes[i].rightNeighbour.material.k/self.h
-                c[i] = self.volumes[i].leftNeighbour.material.k/self.h
+                volume : FiniteVolume = self.volumes[i]
+                a0[i] = volume.material.p*volume.material.c*volume.length/ht
+                b[i] = volume.rightNeighbour.material.k/volume.distantW
+                c[i] = volume.leftNeighbour.material.k/volume.distantE
                 d[i] = a0[i]*self.T[i]
                 a[i] = b[i] + c[i] + a0[i]
         
         #вычисляем коэициенты для вектора температур self.T
         c[0] = 0 #Так всегда, из-за того что матрица трёхдиагональная
-        b[0] = self.volumes[0].rightNeighbour.material.k/self.volumes[0].parent.h
+        b[0] = self.volumes[0].rightNeighbour.material.k/self.volumes[0].distantE
         a[0], d[0] = BoundaryCondition.FindCoefs(self, self.conditions.external, self.iterT[0], b[0])
         FindKoef(self, a0, b, c, d, a)
-        size = a0.size
-        b[size-1] = 0 #Так всегда, аналогично тому что выше
-        c[size-1] = self.volumes[size-1].leftNeighbour.material.k/self.volumes[size-1].parent.h
-        a[size-1], d[size-1] = BoundaryCondition.FindCoefs(self, self.conditions.ethernal, self.iterT[size-1], c[size-1])
+        b[-1] = 0 #Так всегда, аналогично тому что выше
+        c[-1] = self.volumes[-1].leftNeighbour.material.k/self.volumes[-1].distantW
+        a[-1], d[-1] = BoundaryCondition.FindCoefs(self, self.conditions.ethernal, self.iterT[-1], c[-1])
         #вычислили коэфициенты 
         
         self.iterT = SMath.TDMA(a, b, c, d, P, Q) # решили методом простой прогонки и обновили вектор температур
     
 class FiniteVolume(): #конечный объём и его характеристики
 
-    def __init__(self, x: np.float64, length : np.float64, area : np.float64, material: Material, parent: Box): 
+    def __init__(self, x: np.float64, distantE, distantW, length : np.float64, area : np.float64, material: Material, parent: Box): 
         self.x = x
         self.length = length
         self.material = material
         self.parent = parent
+        self.distantE = distantE
+        self.distantW = distantW
         self.area = area
 
     def knit(self, leftNeightbour : 'FiniteVolume', rightNeighbour : 'FiniteVolume', onLeftEdge: bool, onRightEdge: bool):
@@ -253,6 +250,7 @@ class FiniteVolume(): #конечный объём и его характери�
         self.rightNeighbour = rightNeighbour
         self.onLeftEdge = onLeftEdge
         self.onRightEdge = onRightEdge
+        
 
 class Conditions(): #класс для нагрузок действующих на спутник
     def __init__(self):

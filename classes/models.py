@@ -29,8 +29,9 @@ class Sputnik(): # спутник
         #инициалируем стенки спутника
         for i in np.arange(6):
             self.boxes.append(Box(0, width, self.size[i], material, i, self.default_orientation[i], coat, self))
-    
-    def knitPlates(self): #связываем пластины, чтобы знать какая с какой соприкасается
+        self._knitPlates()
+        
+    def _knitPlates(self): #связываем пластины, чтобы знать какая с какой соприкасается
         for box in self.boxes:
             box.neighbours = []
         
@@ -87,7 +88,7 @@ class Sputnik(): # спутник
         
         new_disp = np.empty(len(self.boxes), dtype=np.float64)
         
-        while disperancy > 10**(-2):
+        while disperancy > 10**(-1):
             for i in np.arange(len(self.boxes)):
                 self.boxes[i].prevIterT = self.boxes[i].iterT
             
@@ -126,7 +127,6 @@ class Sputnik(): # спутник
                     
                 if radiation_check:
                     self.writeHeat(file2, self.ht) 
-
                 if j % save_every == 0:
                     self.writeResult(file, self.ht, i, j)
                 
@@ -187,24 +187,21 @@ class Box(): #родная коробочка
         self.iterT = []
         self.prevIterT = []
         self.contactT = []
-        self.h = []
         self.neighbours : list[Box] = []
 
     def createVolumes(self, n : int): #нарезам всё на конечные объёмы
-        h = self.length/(n-2)
-        self.h = h
+        h = self.length/(n-1)
         self.volumes : list[FiniteVolume] = []
         self.T = np.empty(n, dtype=np.float64)
-        
-        x = self.x
-        self.volumes.append(FiniteVolume(x, h, None, 0, self.area, self.material , self))
-        for i in range(1, n-1):
-            x += self.h
-            self.volumes.append(FiniteVolume(x, h, h, h, self.area, self.material , self))
-        self.volumes.append(FiniteVolume(x + h, None, h, 0, self.area, self.material , self))
-        self.knitVolumes()
 
-    def knitVolumes(self): #связываем конечные объёмы
+        x = self.x
+        self.volumes.append(FiniteVolume(x, h/2, self.area, self.material, self))
+        for i in range(1, n-1):
+            self.volumes.append(FiniteVolume(x + h*i, h, self.area, self.material , self))
+        self.volumes.append(FiniteVolume(self.x+self.length, h/2, self.area, self.material , self))
+        self._knitVolumes()
+
+    def _knitVolumes(self): #связываем конечные объёмы
         n = len(self.volumes)
         self.volumes[0].knit([], self.volumes[1], True, False)
         for i in np.arange(1, n-1):
@@ -223,25 +220,35 @@ class Box(): #родная коробочка
         
         #вычисляем коэициенты для вектора температур self.T
         c[0] = 0 #Так всегда, из-за того что матрица трёхдиагональная
-        b[0] = self.volumes[0].rightNeighbour.material.k/self.volumes[0].distantE
-        a[0], d[0] = BoundaryCondition.FindCoefs(self, self.conditions.external, self.iterT[0], b[0])
+        volume = self.volumes[0]
+        a0[0] = volume.material.p*volume.material.c*volume.length/ht
+        b[0] = volume.rightNeighbour.material.k/volume.distantE
+        fp, fc = BoundaryCondition.linearize(self, self.conditions.external, self.iterT[0])
+        a[0] = a0[0] + b[0] - fp
+        d[0] = a0[0]*self.T[0] + fc
+        
         FindKoef(self, a0, b, c, d, a)
-        b[-1] = 0 #Так всегда, аналогично тому что выше
-        c[-1] = self.volumes[-1].leftNeighbour.material.k/self.volumes[-1].distantW
-        a[-1], d[-1] = BoundaryCondition.FindCoefs(self, self.conditions.ethernal, self.iterT[-1], c[-1])
+        
+        b[-1] = 0 #Так всегда, из-за того что матрица трёхдиагональная
+        volume = self.volumes[-1]
+        a0[-1] = volume.material.p*volume.material.c*volume.length/ht
+        c[-1] = volume.leftNeighbour.material.k/volume.distantW
+        fp, fc = BoundaryCondition.linearize(self, self.conditions.ethernal, self.iterT[-1])
+        a[-1] = a0[-1] + c[-1] - fp
+        d[-1] = a0[-1]*self.T[-1] + fc
         #вычислили коэфициенты 
         
         self.iterT = SMath.TDMA(a, b, c, d, P, Q) # решили методом простой прогонки и обновили вектор температур
     
 class FiniteVolume(): #конечный объём и его характеристики
 
-    def __init__(self, x: np.float64, distantE, distantW, length : np.float64, area : np.float64, material: Material, parent: Box): 
+    def __init__(self, x: np.float64, length : np.float64, area : np.float64, material: Material, parent: Box): 
         self.x = x
         self.length = length
         self.material = material
         self.parent = parent
-        self.distantE = distantE
-        self.distantW = distantW
+        self.distantE = None
+        self.distantW = None
         self.area = area
 
     def knit(self, leftNeightbour : 'FiniteVolume', rightNeighbour : 'FiniteVolume', onLeftEdge: bool, onRightEdge: bool):
@@ -250,6 +257,16 @@ class FiniteVolume(): #конечный объём и его характери�
         self.rightNeighbour = rightNeighbour
         self.onLeftEdge = onLeftEdge
         self.onRightEdge = onRightEdge
+        
+        if self.onLeftEdge:
+            self.distantW = None
+        else:
+            self.distantW = np.abs(self.x - self.leftNeighbour.x)
+        
+        if self.onRightEdge:
+            self.distantE = None
+        else:
+            self.distantE = np.abs(self.x - self.rightNeighbour.x)
         
 
 class Conditions(): #класс для нагрузок действующих на спутник
@@ -285,10 +302,3 @@ class BoundaryCondition(): #граничное условие
         fc = fT - fp * T
         
         return fp, fc
-    
-    def FindCoefs(box, conditions, T, a1): #вычисление коэфициентов для граничных условий
-        fp, fc = BoundaryCondition.linearize(box, conditions, T)
-        
-        a = a1 -fp
-        d = fc
-        return a, d

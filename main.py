@@ -21,11 +21,11 @@ cond2.addEt(wl.TableFunctionPeriodicalHeat([0, 0, 1000, 1000, 0, 0],
                                            orbit.period))
 
 sp.addCondition(cond)
-#sp.addConditionByNum(cond2, 0)
+sp.addConditionByNum(cond2, 0)
 wl.Connect.neighbours(sp, 0.1)
 
 start = time.time()
-sp.solve(60, 200, 1, 300, radiation_check=True)
+sp.solve(60, 350, 1, 300, radiation_check=True)
 end = time.time()
 print(end-start)
 

@@ -31,13 +31,7 @@ def extractcol(l):
 cut = period
 for i in range(len(T)):
     T[i] = extractcol(T[i])
-    newT = np.empty(len(T[i]) - period)
-    for j in range(len(T[i]) - period - 1):
-        newT[j] = T[i][j+period+1] - T[i][j]
-    T[i] = newT
-    # T1 = T[i][cut:]
-    # T2 = T[i][:-cut]
-    # T[i] = T1 - T2
+    T[i] = T[i][cut:] - T[i][:-cut]
 
 for i in range(len(labels)):
     plt.plot(t[cut:], T[i], color = colors[i], label = labels[i])

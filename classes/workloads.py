@@ -220,5 +220,3 @@ class TableFunctionPeriodicalHeat(TableFunctionPeriodicalFlux): # тоже са�
     def heatFlux(self, box, t):
         return super().heatFlux(box, t)/box.area
 
-class ConstantTemperature(Load):
-    pass

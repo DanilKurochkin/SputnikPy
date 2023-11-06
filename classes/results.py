@@ -28,6 +28,7 @@ class Checker():
         T = [[],[],[],[],[],[]]
 
         with open('output.txt', 'r') as f:
+            f.readline()
             while True:
                 string = f.readline()
                 if string == '':

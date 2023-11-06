@@ -120,7 +120,8 @@ class Sputnik(): # спутник
         file = open(filePath, 'w+')
         if radiation_check:
             file2 = open(HeatCheckPath, 'w+')
-        
+            
+        file.write(f'{pointsInRounds}\n')
         for i in np.arange(amountOfRounds):
             for j in np.arange(pointsInRounds):
                 self.boxesNextT(self.ht, a0, b, c, d, a, P, Q)

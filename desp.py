@@ -31,14 +31,14 @@ def extractcol(l):
 cut = period
 for i in range(len(T)):
     T[i] = extractcol(T[i])
-    T[i] = T[i][cut:] - T[i][:-cut]
+    T[i] = np.abs(T[i][cut:] - T[i][:-cut])
 
 for i in range(len(labels)):
     plt.plot(t[cut:], T[i], color = colors[i], label = labels[i])
 
 plt.xlabel('Время [c]')
 plt.ylabel('Температура [K]')
-
+plt.xscale('log')
 plt.legend()
 
 plt.show()

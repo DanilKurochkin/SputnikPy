@@ -49,7 +49,7 @@ class Sun(Load): #Солнце
         
         dot = np.dot(self.orientation, box.orientation)
         if(dot > 0):
-            return dot* self.q * box.parent.coat.As
+            return dot* self.q * box.coat.As
         
         return np.float64(0)
 
@@ -58,11 +58,11 @@ class Radiaton(Load): #Тепловое излучения с пластины
         pass
     
     def heatFlux(self, box, T): #Закон Стефана-Больцмана
-        q = np.float64(-sigma*box.parent.coat.epsilon*T**4)
+        q = np.float64(-sigma*box.coat.epsilon*T**4)
         return q
     
     def derivative(self, box, T):
-        return -4*sigma*box.parent.coat.epsilon*T**3
+        return -4*sigma*box.coat.epsilon*T**3
     
 class Isolated(Load): #изолированная сторона
     def __init__(self):

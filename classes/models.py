@@ -19,7 +19,7 @@ class Sputnik(): # спутник
                                 Lx*Lz, Lx*Lz,
                                 Lx*Ly, Lx*Ly]) #площадь пластинок
         self.boxes : List[Box] = []
-        self.coat = coat
+        self.coat = None
         self.orbit = orbit
         self.boxes
         self.ht = None
@@ -88,7 +88,7 @@ class Sputnik(): # спутник
         
         new_disp = np.empty(len(self.boxes), dtype=np.float64)
         
-        while disperancy > 10**(-1):
+        while disperancy > 10**(-2):
             for i in np.arange(len(self.boxes)):
                 self.boxes[i].prevIterT = self.boxes[i].iterT
             

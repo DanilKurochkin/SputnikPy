@@ -38,7 +38,7 @@ for i in range(len(labels)):
 
 plt.xlabel('Время [c]')
 plt.ylabel('Температура [K]')
-plt.xscale('log')
+plt.yscale('log')
 plt.legend()
 
 plt.show()

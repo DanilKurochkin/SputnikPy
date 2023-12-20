@@ -19,7 +19,9 @@ cond2.addEt(wl.TableFunctionPeriodicalHeat([0, 0, 1000, 1000, 0, 0],
 
 sp.addCondition(cond2)
 
+print([0, orbit.period/4-1, orbit.period/4, 3*orbit.period/4, 3*orbit.period/4+1, orbit.period])
+
 start = time.time()
-sp.solve(4, 100, 1, 300, radiation_check=True)
+#sp.solve(4, 100, 1, 300, radiation_check=True)
 end = time.time()
 print(end-start)

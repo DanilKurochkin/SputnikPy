@@ -6,7 +6,7 @@ from classes.results import Checker
 import time
         
 mat = Material(c=800, p=2700, k=100)
-coat = Coating(As=0.8, epsilon=0.2)
+coat = Coating(As=0.6, epsilon=0.4)
 orbit = SunLookingOrbit(radiusAboveEarth=500)
 
 sp = Sputnik(Lx=1,Ly=1, Lz=1, width=0.005, material=mat, coat=coat, orbit=orbit)  

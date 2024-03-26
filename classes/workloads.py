@@ -27,6 +27,9 @@ class Load(ABC): #Базовый функционал для любой нагр
     
     def derivative(self, box : Box, T): #Производная теплового потока потока по температуре, определяется наследником
         return 0
+    
+    def is_connection(self):
+        return False
 
 class Sun(Load): #Солнце
     
@@ -96,7 +99,7 @@ class Connect(): #Служебный класс для соединения пл
             raise ValueError
         box1.conditions.addEt(HeatPipe(R, box1, box2))
         box1.conditions.addEt(HeatPipe(R, box2, box1))
-
+    
 class Connection(Load): #Класс термического контакта
     
     def __init__(self, R, box, connectedBox) -> None:
@@ -117,6 +120,9 @@ class Connection(Load): #Класс термического контакта
     
     def derivative(self, box, t):
         return -1/self.R
+    
+    def is_connection(self):
+        return True
 
 class EarthRadiation(Load): #Земное излучение
     def __init__(self, q, radius) -> None:
@@ -157,7 +163,7 @@ class EarthAlbedo(Load): #Солнечное излучение отраженн
     
     def heatFlux(self, box, T): #Аналогично тому что происходит для солнечного излучения, но добавляется ограничение, так как земная поверхность должна быть не в тени
         if box.parent.orbit.InShadow():
-            return np.float64(0)
+            return 0
         
         dot = np.dot(self.orientation, box.orientation)
         

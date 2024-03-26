@@ -63,13 +63,19 @@ class Sputnik(): # спутник
         format2 = '{0:16.3f} '
         for box in self.boxes:
             for external in box.conditions.external:
-                file.write(format2.format(external.heat(box, box.T[0]) * ht))
+                value = external.heat(box, box.T[0])
+                file.write(format2.format(value * ht))
+                if value > 0:
+                    box.integr.append(value)
             
             for ethernal in box.conditions.ethernal:
-                file.write(format2.format(ethernal.heat(box, box.T[box.T.size-1]) * ht))
-            file.write('\n')
-
-        file.write('\n')
+                value = ethernal.heat(box, box.T[0])
+                file.write(format2.format(value * ht))
+                if (not ethernal.is_connection()) and value > 0:
+                    box.integr.append(value)
+            file.write('\n')    
+                
+        file.write('\n\n')
     
     def writeInnerEnergy(self, file, startT):
         format2 = '{0:13.3f} '
@@ -124,6 +130,7 @@ class Sputnik(): # спутник
         file.write(f'{pointsInRounds}\n')
         for i in np.arange(amountOfRounds):
             for j in np.arange(pointsInRounds):
+                print(f"Solving {i} round {j} point")
                 self.boxesNextT(self.ht, a0, b, c, d, a, P, Q)
                     
                 if radiation_check:
@@ -189,6 +196,7 @@ class Box(): #родная коробочка
         self.prevIterT = []
         self.contactT = []
         self.neighbours : list[Box] = []
+        self.integr = []
 
     def createVolumes(self, n : int): #нарезам всё на конечные объёмы
         h = self.length/(n-1)

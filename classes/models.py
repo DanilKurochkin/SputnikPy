@@ -108,7 +108,17 @@ class Sputnik(): # спутник
         for i in np.arange(len(self.boxes)):
             self.boxes[i].T = self.boxes[i].iterT
     
-    def solve(self, amountOfRounds : int, pointsInRounds : int, save_every, startT = 300,filePath = 'output.txt', radiation_check = False, HeatCheckPath = 'outputheat.txt'): #решаем численно всё для всех пластинок в спутнике
+    def solve(
+        self,
+        amountOfRounds : int,
+        pointsInRounds : int,
+        save_every,
+        startT = 300,
+        filePath = 'result/output.txt',
+        radiation_check = False,
+        HeatCheckPath = 'result/outputheat.txt'
+        ): #решаем численно всё для всех пластинок в спутнике
+        
         n = self.boxes[0].T.size
 
         a0 = np.empty(n, dtype=np.float64) #чтобы лишний раз много памяти не выделять

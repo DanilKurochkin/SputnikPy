@@ -6,7 +6,7 @@ labels = ['Зенит', 'Надир', 'Перпендикулярная 1', 'П�
 colors = ['red', 'blue', 'green', 'grey', 'purple', 'yellow']
 T = [[],[],[],[],[],[]]
 
-with open('output.txt', 'r') as f:
+with open('result/output.txt', 'r') as f:
     f.readline()
     while True:
         string = f.readline()
